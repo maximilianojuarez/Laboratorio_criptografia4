@@ -1,0 +1,121 @@
+from Crypto.Cipher import AES, DES, DES3
+from Crypto.Random import get_random_bytes
+import sys
+
+
+def pad(data, block_size):
+    padding_length = block_size - (len(data) % block_size)
+    padding = bytes([padding_length] * padding_length)
+    return data + padding
+
+def unpad(data, block_size):
+    if not data:
+        raise ValueError("Datos vacíos, no se puede quitar relleno")
+        
+    padding_length = data[-1]
+    
+    if padding_length < 1 or padding_length > block_size:
+        raise ValueError(f"Relleno (padding) inválido")
+    
+    if data[-padding_length:] != bytes([padding_length] * padding_length):
+        raise ValueError("Relleno (padding) incorrecto")
+        
+    return data[:-padding_length]
+
+
+def ajustar_largo(texto_in, largo_req):
+    
+    data_bytes = texto_in.encode('utf-8')
+    
+    if len(data_bytes) < largo_req:
+        print(f"    (Ajustando entrada: rellenando a {largo_req} bytes)")
+        missing_bytes = largo_req - len(data_bytes)
+        return data_bytes + get_random_bytes(missing_bytes)
+    
+    elif len(data_bytes) > largo_req:
+        print(f"    (Ajustando entrada: truncando a {largo_req} bytes)")
+        return data_bytes[:largo_req]
+    
+    else:
+        return data_bytes
+
+def encrypt(algo_class, key, iv, plaintext_bytes, block_size):
+    try:
+        cipher = algo_class.new(key, algo_class.MODE_CBC, iv)
+        padded_plaintext = pad(plaintext_bytes, block_size)
+        ciphertext = cipher.encrypt(padded_plaintext)
+        return ciphertext
+    except Exception as e:
+        print(f"Error durante el cifrado: {e}")
+        return None
+
+def decrypt(algo_class, key, iv, ciphertext, block_size):
+    try:
+        decipher = algo_class.new(key, algo_class.MODE_CBC, iv)
+        padded_plaintext = decipher.decrypt(ciphertext)
+        plaintext_bytes = unpad(padded_plaintext, block_size)
+        return plaintext_bytes
+    except ValueError as e:
+        print(f"\nError al descifrar: {e}")
+        print("    (Esto usualmente significa que la clave o el IV son incorrectos)")
+        return None
+    except Exception as e:
+        print(f"Error durante el descifrado: {e}")
+        return None
+
+
+def main():
+    
+  
+    print("Se ajustará la clave y el IV para cada algoritmo según sea necesario.")
+    key_input = input("Ingrese la Clave (string base): ")
+    iv_input = input("Ingrese el IV (string base): ")
+    text_input = input("Ingrese el Texto a cifrar: ")
+    
+    plaintext_bytes = text_input.encode('utf-8')
+    
+    if not plaintext_bytes:
+        print("El texto a cifrar no puede estar vacío. Saliendo.")
+        sys.exit()
+
+    print("\n--- Ejecutando AES-256  ---")
+    key_aes = ajustar_largo(key_input, 32) # 32 bytes (256 bits)
+    iv_aes = ajustar_largo(iv_input, 16)   # 16 bytes (128 bits)
+    print(f"Clave AES (hex): {key_aes.hex()}")
+    print(f"IV AES (hex):    {iv_aes.hex()}")
+    
+    ciphertext_aes = encrypt(AES, key_aes, iv_aes, plaintext_bytes, 16)
+    if ciphertext_aes:
+        print(f"Cifrado AES (hex): {ciphertext_aes.hex()}")
+        decrypted_aes = decrypt(AES, key_aes, iv_aes, ciphertext_aes, 16)
+        if decrypted_aes:
+            print(f"Descifrado AES: {decrypted_aes.decode('utf-8')}")
+
+    print("\n--- Ejecutando DES ---")
+    key_des = ajustar_largo(key_input, 8) # 8 bytes (56 bits útiles)
+    iv_des = ajustar_largo(iv_input, 8)  # 8 bytes (64 bits)
+    print(f"Clave DES (hex): {key_des.hex()}")
+    print(f"IV DES (hex):    {iv_des.hex()}")
+    
+    ciphertext_des = encrypt(DES, key_des, iv_des, plaintext_bytes, 8)
+    if ciphertext_des:
+        print(f"Cifrado DES (hex): {ciphertext_des.hex()}")
+        decrypted_des = decrypt(DES, key_des, iv_des, ciphertext_des, 8)
+        if decrypted_des:
+            print(f"Descifrado DES: {decrypted_des.decode('utf-8')}")
+
+    print("\n--- Ejecutando 3DES ---")
+    key_3des = ajustar_largo(key_input, 24) # 24 bytes (168 bits útiles)
+    iv_3des = ajustar_largo(iv_input, 8)   # 8 bytes (64 bits)
+    print(f"Clave 3DES (hex): {key_3des.hex()}")
+    print(f"IV 3DES (hex):    {iv_3des.hex()}")
+    
+    ciphertext_3des = encrypt(DES3, key_3des, iv_3des, plaintext_bytes, 8)
+    if ciphertext_3des:
+        print(f"Cifrado 3DES (hex): {ciphertext_3des.hex()}")
+        decrypted_3des = decrypt(DES3, key_3des, iv_3des, ciphertext_3des, 8)
+        if decrypted_3des:
+            print(f"Descifrado 3DES: {decrypted_3des.decode('utf-8')}")
+            
+if __name__ == "__main__":
+    main()
